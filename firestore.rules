@@ -1,0 +1,96 @@
+// Œil Volant : carte privée, administrateur et collaborateurs invités.
+// IMPORTANT : remplacer 'ton.adresse@gmail.com' par l'adresse Google du propriétaire.
+// Copier dans Firebase Console > Firestore Database > Règles > Publier.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function loggedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function owner() {
+      return loggedIn() && request.auth.token.email == 'ton.adresse@gmail.com';
+    }
+    function memberPath() {
+      return /databases/$(database)/documents/teams/oeil-volant/members/$(request.auth.token.email);
+    }
+    function memberRole() {
+      return loggedIn() && exists(memberPath()) ? get(memberPath()).data.role : 'none';
+    }
+    function reader() {
+      return owner() || memberRole() in ['editor', 'reader'];
+    }
+    function editor() {
+      return owner() || memberRole() == 'editor';
+    }
+    function basicRecord() {
+      return request.resource.data.keys().hasAll(['name','notes','createdBy','createdByEmail','updatedBy','updatedAt','createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 100
+        && request.resource.data.notes is string
+        && request.resource.data.notes.size() <= 4000
+        && request.resource.data.createdBy is string
+        && request.resource.data.createdByEmail is string
+        && request.resource.data.updatedBy is string
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+    }
+    function recordCreate() {
+      return editor() && basicRecord()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdByEmail == request.auth.token.email
+        && request.resource.data.updatedBy == request.auth.token.email;
+    }
+    function recordUpdate() {
+      return editor() && basicRecord()
+        && (owner() || resource.data.createdBy == request.auth.uid)
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.createdByEmail == resource.data.createdByEmail
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedBy == request.auth.token.email;
+    }
+    match /teams/oeil-volant/members/{email} {
+      allow get: if owner() || (loggedIn() && request.auth.token.email == email);
+      allow list: if owner();
+      allow create, update: if owner()
+        && email != request.auth.token.email
+        && request.resource.data.keys().hasOnly(['email','role','updatedAt'])
+        && request.resource.data.email == email
+        && request.resource.data.role in ['editor','reader']
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if owner();
+    }
+    match /teams/oeil-volant/spots/{spotId} {
+      allow read: if reader();
+      allow create: if recordCreate()
+        && request.resource.data.keys().hasOnly(['name','notes','createdBy','createdByEmail','updatedBy','updatedAt','createdAt','category','point','link'])
+        && request.resource.data.category in ['photo','video','fpv','auto','paysage','autre']
+        && request.resource.data.point is list && request.resource.data.point.size() == 2
+        && request.resource.data.link is string && request.resource.data.link.size() <= 2000;
+      allow update: if recordUpdate()
+        && request.resource.data.keys().hasOnly(['name','notes','createdBy','createdByEmail','updatedBy','updatedAt','createdAt','category','point','link'])
+        && request.resource.data.category in ['photo','video','fpv','auto','paysage','autre']
+        && request.resource.data.point is list && request.resource.data.point.size() == 2
+        && request.resource.data.link is string && request.resource.data.link.size() <= 2000;
+      allow delete: if editor() && (owner() || resource.data.createdBy == request.auth.uid);
+    }
+    match /teams/oeil-volant/routes/{routeId} {
+      allow read: if reader();
+      allow create: if recordCreate()
+        && request.resource.data.keys().hasOnly(['name','notes','createdBy','createdByEmail','updatedBy','updatedAt','createdAt','type','color','points','geometry','distance'])
+        && request.resource.data.type is string
+        && request.resource.data.color is string
+        && request.resource.data.points is list && request.resource.data.points.size() >= 2 && request.resource.data.points.size() <= 100
+        && request.resource.data.geometry is list && request.resource.data.geometry.size() >= 2 && request.resource.data.geometry.size() <= 15000
+        && request.resource.data.distance is number;
+      allow update: if recordUpdate()
+        && request.resource.data.keys().hasOnly(['name','notes','createdBy','createdByEmail','updatedBy','updatedAt','createdAt','type','color','points','geometry','distance'])
+        && request.resource.data.type is string
+        && request.resource.data.color is string
+        && request.resource.data.points is list && request.resource.data.points.size() >= 2 && request.resource.data.points.size() <= 100
+        && request.resource.data.geometry is list && request.resource.data.geometry.size() >= 2 && request.resource.data.geometry.size() <= 15000
+        && request.resource.data.distance is number;
+      allow delete: if editor() && (owner() || resource.data.createdBy == request.auth.uid);
+    }
+  }
+}

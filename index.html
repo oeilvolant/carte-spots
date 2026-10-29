@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Œil Volant — Spots, routes & cartes aéronautiques</title>
+  <meta name="theme-color" content="#171326">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root { --bg:#171327; --panel:#201a34; --panel-2:#2b2343; --text:#f8f6ff; --muted:#b7b0c9; --accent:#b39bff; --border:rgba(255,255,255,.11); --teal:#51d8ba; --orange:#ffbd78; --red:#ff8b9b; --shadow:0 18px 60px rgba(18,12,35,.20) }
+    * { box-sizing:border-box }
+    html,body { margin:0; height:100%; font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif; color:var(--text); background:var(--bg) }
+    button, input, select, textarea { font:inherit }
+    button { cursor:pointer }
+    .app { height:100vh; height:100dvh; display:grid; grid-template-columns:365px minmax(0,1fr) }
+    .sidebar { background:var(--bg); display:flex; flex-direction:column; overflow:hidden; box-shadow:3px 0 30px rgba(0,0,0,.2); z-index:900 }
+    .brand { padding:24px 23px 14px; border-bottom:1px solid var(--border) }
+    .brand-row { display:flex; align-items:center; gap:12px }
+    .logo { width:45px;height:45px; flex:0 0 45px; display:grid;place-items:center; border-radius:16px; background:linear-gradient(145deg,#8e67ea,#493877); box-shadow:0 4px 20px rgba(137,105,220,.35); font-size:24px }
+    .eyebrow { text-transform:uppercase; font-size:10px; letter-spacing:2.1px; font-weight:800; color:var(--accent) }
+    h1 { font-size:20px; line-height:1.15; margin:4px 0 0; letter-spacing:-.6px }
+    .subtitle { color:var(--muted); font-size:12px; line-height:1.5; margin:14px 0 0 }
+    .stats { display:flex; gap:8px; margin-top:16px }
+    .stat { background:var(--panel); border:1px solid var(--border); border-radius:13px; padding:10px 13px; flex:1 }
+    .stat strong { font-size:20px; font-weight:750; display:block; font-variant-numeric:tabular-nums }
+    .stat span { color:var(--muted); font-size:11px }
+    .actions { padding:14px 18px 12px; display:grid; grid-template-columns:1fr 1fr; gap:8px }
+    .primary { background:var(--accent); color:#241637; border:none; font-weight:800 }
+    .secondary { background:var(--panel-2); color:var(--text); border:1px solid var(--border); font-weight:650 }
+    .btn { min-height:39px; border-radius:11px; padding:9px 10px; display:flex; gap:6px; align-items:center; justify-content:center; font-size:12px; transition:filter .15s,transform .15s }
+    .btn:hover:not(:disabled) { filter:brightness(1.12) }
+    .btn:disabled { opacity:.44; cursor:not-allowed }
+    .section { padding:0 18px 17px; overflow:auto; flex:1; min-height:0; scrollbar-color:#6c5b92 transparent }
+    .tabs { display:grid; grid-template-columns:1fr 1fr; gap:5px; background:#130f22; border-radius:12px; padding:5px; margin:0 0 14px }
+    .tab { min-height:35px; border:0; border-radius:9px; background:transparent; color:var(--muted); font-weight:750; font-size:12px }
+    .tab.selected { color:var(--text); background:var(--panel-2); box-shadow:0 2px 7px rgba(0,0,0,.15) }
+    .search { width:100%; height:38px; background:var(--panel); border:1px solid var(--border); border-radius:10px; color:var(--text); outline:0; padding:0 12px; margin-bottom:13px; font-size:13px }
+    .search:focus,.field:focus { border-color:var(--accent) }
+    .search::placeholder,.field::placeholder { color:#9b92b2 }
+    .empty { padding:28px 16px; border:1px dashed rgba(197,181,236,.28); background:rgba(255,255,255,.018); border-radius:15px; text-align:center; }
+    .empty-icon { font-size:32px; margin-bottom:8px }
+    .empty strong { display:block; font-size:14px; margin-bottom:7px }
+    .empty p { color:var(--muted); font-size:12px; line-height:1.6; margin:0 }
+    .item { display:flex; align-items:flex-start; gap:10px; border:1px solid var(--border); background:var(--panel); border-radius:13px; padding:12px 10px; margin-bottom:9px }
+    .swatch { width:11px; height:11px; border-radius:50%; margin-top:4px; box-shadow:0 0 0 4px rgba(255,255,255,.045); flex:0 0 11px }
+    .item-main { min-width:0;flex:1 }
+    .item-name { font-weight:700; font-size:13px; color:var(--text); overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+    .item-meta { font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5 }
+    .item-actions { display:flex; flex-wrap:wrap; gap:5px; margin-top:9px }
+    .mini { border-radius:7px; min-height:26px; padding:4px 8px; background:#373050; border:1px solid var(--border); color:var(--text); font-size:11px }
+    .mini.danger { color:var(--red) }
+    .visible-toggle { flex:0 0 23px; width:23px; height:23px; color:var(--text); border:0; background:none; font-size:16px; padding:0; }
+    .foot { padding:12px 18px 17px; border-top:1px solid var(--border); background:rgba(19,15,31,.6) }
+    .foot-row { display:flex; gap:8px }
+    .foot-row .btn { flex:1 }
+    .foot p { font-size:10px; color:var(--muted); line-height:1.45; margin:10px 2px 0 }
+    .workspace { position:relative; min-width:0; overflow:hidden }
+    #map { height:100%;width:100%; background:#ddd9e6 }
+    .map-header { position:absolute;z-index:500;left:22px;right:22px;top:19px; display:flex;align-items:center;justify-content:space-between;gap:10px; pointer-events:none }
+    .map-header > * { pointer-events:auto }
+    .map-chip { background:rgba(255,255,255,.97); color:#34274a; border:1px solid rgba(53,37,82,.09); box-shadow:var(--shadow); padding:11px 14px; border-radius:12px; font-size:12px; font-weight:750 }
+    .map-toolbar { display:flex; gap:7px }
+    .map-btn { background:#fff;color:#362b4d;border:1px solid #e8e2ef; border-radius:11px;min-height:38px;padding:8px 12px;font-weight:750;font-size:12px;box-shadow:var(--shadow) }
+    .hint { position:absolute; bottom:22px;left:50%;transform:translateX(-50%);z-index:490;background:rgba(30,23,51,.96);color:white;border:1px solid rgba(255,255,255,.16); border-radius:13px; box-shadow:var(--shadow);padding:12px 17px; font-size:12px;max-width:min(580px,calc(100% - 36px));text-align:center;line-height:1.5 }
+    .hint:empty { display:none }
+    .editor { background:var(--panel);padding:15px;border-radius:14px;border:1px solid var(--border) }
+    .editor h2 {font-size:15px;margin:0 0 5px}
+    .editor .lead {font-size:12px;color:var(--muted);line-height:1.5;margin:0 0 16px}
+    .form-group { margin-bottom:13px }
+    .form-group label {display:block;color:#e1d9f5;font-size:12px;margin-bottom:6px;font-weight:650}
+    .field {width:100%;outline:0;border:1px solid var(--border);border-radius:9px;background:#171229;color:white;padding:10px 11px;font-size:12px;min-height:38px}
+    textarea.field {min-height:70px;resize:vertical}
+    .route-steps { background:#181329;border:1px dashed var(--border);border-radius:10px;padding:10px 11px;color:#c5bde0;font-size:12px;line-height:1.55;margin:12px 0 }
+    .route-steps strong {color:white}
+    .palette {display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .color-btn {width:27px;height:27px;border:2px solid transparent;border-radius:50%;outline:0}
+    .color-btn.active {box-shadow:0 0 0 2px #171229,0 0 0 4px white}
+    .buttons {display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+    .buttons .btn {flex:1}
+    .status {font-size:11px;margin:7px 0 0;color:var(--muted);line-height:1.5;min-height:15px}
+    .status.error {color:var(--red)}
+    .marker-end {border-radius:50%;border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,.28);width:28px;height:28px;display:grid;place-items:center;font:800 12px system-ui;color:white;background:#33294e}
+    .spot-pin {height:32px;width:32px;background:#5f43a4;display:grid;place-items:center;border:2px solid white; border-radius:14px 14px 14px 3px;transform:rotate(-45deg);box-shadow:0 3px 12px rgba(0,0,0,.28);font-size:17px}
+    .spot-pin span {transform:rotate(45deg)}
+    .leaflet-popup-content-wrapper {border-radius:12px}
+    .leaflet-popup-content {font:13px system-ui;color:#302548;line-height:1.5}
+    .leaflet-popup-content strong {font-size:14px}
+    .leaflet-popup-content p {margin:6px 0}
+    .leaflet-popup-content a {color:#6d4fbc}
+    .layer-panel {position:absolute; z-index:510; top:77px; right:22px; width:278px; max-width:calc(100% - 32px); background:rgba(29,23,49,.97); color:#f8f6ff; border:1px solid rgba(231,218,255,.28); border-radius:15px; box-shadow:0 16px 55px rgba(16,12,25,.35); overflow:hidden; font-size:12px; backdrop-filter:blur(12px)}
+    .layer-head {display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; border:0; background:transparent; color:#fff; cursor:pointer; padding:12px 13px; font-size:12px; font-weight:800; text-align:left}
+    .layer-head .indicator {color:var(--accent); font-size:13px}
+    .layer-body {padding:0 13px 13px; border-top:1px solid rgba(255,255,255,.11)}
+    .layer-panel.collapsed .layer-body {display:none}
+    .layer-section-title {font-weight:800; color:#bcaddc; font-size:10px; letter-spacing:1.25px; text-transform:uppercase; margin:13px 0 8px}
+    .base-switch {display:grid; grid-template-columns:1fr 1fr; gap:7px}
+    .base-option {border:1px solid rgba(255,255,255,.13); border-radius:10px; background:rgba(255,255,255,.07); padding:8px 7px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:6px}
+    .base-option:has(input:checked) {border-color:var(--accent); background:rgba(179,155,255,.20)}
+    .layer-panel input {accent-color:#aa8cf2; cursor:pointer}
+    .layer-option {display:flex; align-items:center; gap:9px; min-height:32px; padding:5px 0; cursor:pointer}
+    .layer-option input {width:16px;height:16px;flex:0 0 16px}
+    .layer-option small {font-size:10px;color:#c0b2dc}
+    .opacity-control {display:flex;gap:9px;align-items:center;margin:5px 0 7px 25px;font-size:11px;color:#c7bce2}
+    .opacity-control input {flex:1;min-width:0}
+    .opacity-control[hidden] {display:none}
+    .layer-info {font-size:10px;color:#c3bad7;line-height:1.6;margin:9px 0 0}
+    .layer-info a {color:#d4c2ff;text-decoration:underline;text-underline-offset:2px}
+    .layer-status {font-size:10px; color:#e8a7ad; line-height:1.5; margin:8px 0 0}
+    .layer-status:empty {display:none}
+    .layer-panel:has(.layer-body[hidden]) .layer-body {display:none}
+    .map-key {position:absolute;z-index:450;right:22px;bottom:24px;background:#fff;color:#4d405f;padding:10px 13px;border-radius:11px;box-shadow:var(--shadow);font-size:11px;line-height:1.8}
+    .map-key strong {display:block;color:#271b3e;margin-bottom:2px}
+    .map-key span {display:block}
+    .collab {margin:12px 18px 0; padding:12px; background:var(--panel); border:1px solid var(--border); border-radius:12px}
+    .collab strong {display:block; font-size:12px; margin-bottom:6px}
+    .collab .collab-status {font-size:11px; color:var(--muted); line-height:1.5; overflow-wrap:anywhere; margin-bottom:8px}
+    .collab .btn {width:100%; margin-top:5px}
+    .collab-actions {display:flex; gap:7px}
+    .member-panel {padding:0 18px 12px}
+    .member-panel details {background:var(--panel);border-radius:12px;border:1px solid var(--border);padding:9px 11px;font-size:12px}
+    .member-panel summary {cursor:pointer;font-weight:750}
+    .member-panel form {display:grid;grid-template-columns:1fr 96px;gap:7px;margin-top:10px}
+    .member-panel form input,.member-panel form select {min-width:0;background:#171229;color:white;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:11px}
+    .member-panel form button {grid-column:1 / -1}
+    .member-line {display:flex;align-items:center;justify-content:space-between;gap:7px;padding:7px 0;border-top:1px solid var(--border);font-size:11px}
+    .member-line span {overflow-wrap:anywhere}
+    .member-panel .guide {font-size:10px;color:var(--muted);margin-top:9px;line-height:1.5}
+    .muted-btn {opacity:.55;cursor:not-allowed}
+    .item-owner {color:#b9ade0;font-size:10px;margin-top:5px}
+    .leaflet-top.leaflet-left {top:76px;left:14px}
+    .leaflet-control-attribution {font-size:10px !important}
+    @media(max-width:850px){.app{grid-template-columns:310px minmax(0,1fr)}.brand{padding:19px 17px 12px}.actions{padding:12px}.section{padding:0 12px 13px}.foot{padding:11px}.map-header{left:10px;top:11px;right:10px}.map-key{right:11px;bottom:30px}.layer-panel{right:10px;top:67px}}
+    @media(max-width:620px){.app{display:flex;flex-direction:column}.workspace{height:52dvh;min-height:300px;order:0}.sidebar{height:48dvh;min-height:240px;order:1;box-shadow:0 -4px 28px rgba(0,0,0,.18)}.brand{padding:12px 14px 7px}.brand-row{gap:8px}.logo{width:33px;height:33px;flex-basis:33px;font-size:18px;border-radius:11px}h1{font-size:16px}.subtitle{display:none}.stats{margin-top:8px}.stat{padding:5px 9px}.stat strong{font-size:16px}.actions{padding:8px 12px}.collab{margin:7px 12px 0;padding:8px}.member-panel{padding:0 12px 8px}.actions .btn{min-height:34px}.section{padding:0 12px 10px}.foot{padding:8px 12px}.foot p{display:none}.map-chip{padding:8px 10px;font-size:11px}.map-btn{padding:7px 9px;min-height:33px;font-size:11px}.map-key{display:none}.layer-panel{right:8px;top:52px;width:236px}.layer-head{padding:8px 11px}.layer-body{padding:0 11px 9px}.hint{bottom:17px;font-size:11px;padding:8px 10px}.leaflet-top.leaflet-left{top:46px;left:4px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <header class="brand">
+      <div class="brand-row"><div class="logo" aria-hidden="true">◉</div><div><div class="eyebrow">Carnet de repérage</div><h1>Œil Volant <span style="color:var(--accent)">/ Spots</span></h1></div></div>
+      <p class="subtitle">Une carte collaborative et privée pour tes repérages photo, vidéo et FPV.</p>
+      <div class="stats"><div class="stat"><strong id="routeCount">0</strong><span>Parcours enregistrés</span></div><div class="stat"><strong id="spotCount">0</strong><span>Spots enregistrés</span></div></div>
+    </header>
+    <section class="collab" aria-label="Connexion et partage">
+      <strong>☁ Carte partagée</strong>
+      <div id="cloudStatus" class="collab-status" aria-live="polite">Chargement de la connexion…</div>
+      <div class="collab-actions">
+        <button id="login" class="btn primary" type="button">Se connecter avec Google</button>
+        <button id="logout" class="btn secondary" type="button" hidden>Déconnexion</button>
+      </div>
+    </section>
+    <section class="member-panel" id="memberPanel" hidden>
+      <details><summary>👥 Partager et gérer les accès</summary>
+        <p class="guide">Inviter par e-mail Google. Seuls les membres invités pourront accéder à la carte. Partage ensuite le lien du site.</p>
+        <form id="memberForm">
+          <input type="email" id="memberEmail" required placeholder="adresse@gmail.com" aria-label="E-mail du collaborateur">
+          <select id="memberRole" aria-label="Droit d'accès"><option value="editor">Peut ajouter</option><option value="reader">Lecture seule</option></select>
+          <button class="btn primary" type="submit">+ Autoriser cette personne</button>
+        </form>
+        <button id="copyLink" class="btn secondary" style="width:100%; margin-top:10px" type="button">🔗 Copier le lien de la carte</button>
+        <div id="memberList" style="margin-top:10px"></div>
+      </details>
+    </section>
+    <div class="actions"><button id="newRoute" class="btn primary">↗ Nouveau parcours</button><button id="newSpot" class="btn secondary">＋ Ajouter un spot</button></div>
+    <section class="section">
+      <div id="listView">
+        <div class="tabs"><button class="tab selected" data-tab="routes">↗ Parcours</button><button class="tab" data-tab="spots">⌖ Spots</button></div>
+        <input id="filter" class="search" placeholder="Rechercher un lieu ou un parcours..." aria-label="Rechercher">
+        <div id="items"></div>
+      </div>
+      <div id="editorView" hidden></div>
+    </section>
+    <footer class="foot"><div class="foot-row"><button id="export" class="btn secondary">↓ Sauvegarder</button><button id="import" class="btn secondary">↑ Importer</button><input id="importFile" type="file" accept=".json,application/json" hidden></div><p>Données communes synchronisées via Firebase après configuration et connexion. L’import fusionne les anciennes sauvegardes, sans effacer les créations des autres. Fonds IGN, OACI, DGAC et calculs d’itinéraires : connexion Internet requise. Calcul via serveur de démonstration, pour un usage de test et non pour une exploitation commerciale régulière.</p></footer>
+  </aside>
+  <main class="workspace">
+    <div id="map" role="application" aria-label="Carte interactive des spots et des parcours"></div>
+    <div class="map-header"><div class="map-chip">📍 Nancy · Lorraine · France</div><div class="map-toolbar"><button id="fitMap" class="map-btn" title="Voir tous les éléments">Tout voir</button><button id="nancy" class="map-btn" title="Recentrer sur Nancy">Nancy</button></div></div>
+    <section class="layer-panel" id="layerPanel" aria-label="Fonds de carte et surcouches">
+      <button id="layerHead" class="layer-head" type="button" aria-expanded="true" aria-controls="layerBody"><span>🗺️ Fonds & couches</span><span class="indicator" id="layerChevron">▴</span></button>
+      <div id="layerBody" class="layer-body">
+        <div class="layer-section-title">Fond de carte</div>
+        <div class="base-switch" role="radiogroup" aria-label="Choix du fond de carte">
+          <label class="base-option"><input type="radio" name="baseMap" value="street" checked> 🗺️ Plan</label>
+          <label class="base-option"><input type="radio" name="baseMap" value="satellite"> 🛰️ Satellite</label>
+        </div>
+        <div class="layer-section-title">Couches superposées</div>
+        <label class="layer-option"><input id="oaciToggle" type="checkbox"> <span>✈️ OACI-VFR <small>2026</small></span></label>
+        <div class="opacity-control" id="oaciOpacityControl" hidden><label for="oaciOpacity">Opacité</label><input id="oaciOpacity" type="range" min="25" max="100" value="75" step="5"><span id="oaciOpacityValue">75 %</span></div>
+        <label class="layer-option"><input id="uasToggle" type="checkbox"> <span>🚁 Restrictions drones <small>DGAC</small></span></label>
+        <p class="layer-info">Les tracés et marqueurs restent visibles au-dessus des couches. OACI ≠ autorisation drone.<br><a href="https://cartes.gouv.fr/explorer-les-cartes/" target="_blank" rel="noopener noreferrer">Cartes officielles</a> · <a href="https://www.sia.aviation-civile.gouv.fr/" target="_blank" rel="noopener noreferrer">SIA / NOTAM</a></p>
+        <p id="layerStatus" class="layer-status" aria-live="polite"></p>
+      </div>
+    </section>
+    <div id="hint" class="hint" aria-live="polite"></div>
+    <div class="map-key"><strong>Légende</strong><span>🟢 Départ &nbsp; 🔴 Arrivée</span><span>🟣 Spot photo / vidéo</span><span>━ Parcours sauvegardés</span><span style="color:#80678a">OACI ≠ autorisation de vol drone</span></div>
+  </main>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="./firebase-config.js"></script>
+<script>
+'use strict';
+(() => {
+  const STORAGE='oeil-volant-spots-v1';
+  const COLORS=['#8156e8','#ed7b49','#2bb69a','#368fea','#e45d9b','#b7942b'];
+  const CATEGORIES={photo:['📷','Photographie'],video:['🎬','Vidéo'],fpv:['🚁','Drone / FPV'],auto:['🏎️','Auto / Moto'],paysage:['🌄','Paysage'],autre:['📍','Autre']};
+  const $=id=>document.getElementById(id);
+  const fmtDist=metres=>metres>=1000?(metres/1000).toLocaleString('fr-FR',{maximumFractionDigits:2})+' km':Math.round(metres)+' m';
+  const esc=str=>String(str??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const uid=()=> typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);
+  let data={routes:[],spots:[]}, cloud=null, user=null, role=null, cloudReady=false, tab='routes', mode='idle', draft=null, editId=null, routeRequestId=0, requestController=null, routeTimer=null;
+  // Seuls les choix de visibilité restent propres à ce navigateur.
+  const hideKey='oeil-volant-hidden-local-v3';
+  const hiddenIds=new Set((()=>{try{return JSON.parse(localStorage.getItem(hideKey))||[]}catch{return []}})());
+  function saveHidden(){try{localStorage.setItem(hideKey,JSON.stringify([...hiddenIds]))}catch{}}
+  const canWrite=()=>cloudReady && (role==='admin'||role==='editor');
+  const canEditItem=item=>canWrite() && (role==='admin'||item.createdBy===user?.uid);
+  function redraw(){drawAll();renderList()}
+  function cloudMessage(message){$('cloudStatus').textContent=message}
+  function syncData(next){
+    data={routes:next.routes.map(r=>({...r,hidden:hiddenIds.has(r.id)})),spots:next.spots.map(s=>({...s,hidden:hiddenIds.has(s.id)}))};
+    if(mode==='idle')redraw(); else {drawAll();renderList()}
+  }
+  function authChanged(info){
+    user=info.user;role=info.role;cloudReady=!!role;
+    $('login').hidden=!!user;
+    $('logout').hidden=!user;
+    $('memberPanel').hidden=role!=='admin';
+    const names={admin:'Administrateur',editor:'Collaborateur',reader:'Consultation seule'};
+    cloudMessage(!user?'Connexion requise pour voir ou ajouter des spots.':role?`${user.email} · ${names[role]} · synchronisation active`:`${user.email} · accès non autorisé. Demande au propriétaire de t’inviter.`);
+    if(mode!=='idle')stopEditing();
+    redraw();
+  }
+  async function initCloud(){
+    const config=window.OEIL_FIREBASE_CONFIG;
+    if(!config?.apiKey || config.apiKey.includes('COLLER_') || !config.projectId || config.projectId==='TON_PROJET'){
+      cloudMessage('Site à configurer : ajouter les paramètres Firebase dans firebase-config.js. Aucune donnée partagée pour l’instant.');
+      $('login').disabled=true;redraw();return;
+    }
+    try {
+      cloudMessage('Connexion à Firebase…');
+      const module=await import('./collab.js');
+      cloud=module.connectCloud(config,{
+        onAuth:authChanged,onData:syncData,
+        onMembers:members=>{$('memberList').innerHTML=members.length?members.map(m=>`<div class="member-line"><span>${esc(m.email)} · ${m.role==='editor'?'Éditeur':'Lecteur'}</span><button class="mini danger" data-remove-member="${esc(m.email)}">Retirer</button></div>`).join(''):'<p class="guide">Aucun collaborateur invité.</p>'},
+        onError:msg=>{cloudMessage('Erreur de synchronisation : '+msg);showToast('Firebase : '+msg,true)}
+      });
+    }catch(error){cloudMessage('Connexion Firebase impossible : '+error.message);$('login').disabled=true;}
+  }
+  $('login').addEventListener('click',async()=>{try{await cloud?.signIn()}catch(e){showToast('Connexion impossible : '+e.message,true)}});
+  $('logout').addEventListener('click',async()=>{try{await cloud?.signOut()}catch(e){showToast(e.message,true)}});
+  $('memberForm').addEventListener('submit',async e=>{e.preventDefault();if(role!=='admin')return;
+    const submit=$('memberForm').querySelector('[type="submit"]');submit.disabled=true;
+    try{await cloud.upsertMember($('memberEmail').value,$('memberRole').value);$('memberEmail').value='';showToast('✓ Accès autorisé. Partage maintenant l’adresse du site à cette personne.')}catch(e){showToast(e.message,true)}finally{submit.disabled=false}
+  });
+  $('copyLink').addEventListener('click',async()=>{
+    try { await navigator.clipboard.writeText(location.href.split('#')[0]);
+      showToast('Lien copié ! Pense à autoriser la personne dans « Partager et gérer les accès ».');
+    } catch { showToast('Copie l’adresse du site dans la barre de ton navigateur pour la partager.',true); }
+  });
+  $('memberList').addEventListener('click',async e=>{
+    const btn=e.target.closest('[data-remove-member]');if(!btn)return;
+    const email=btn.dataset.removeMember;if(!confirm('Retirer l’accès de '+email+' ?'))return;
+    try{await cloud.removeMember(email);showToast('Accès retiré pour '+email)}catch(e){showToast(e.message,true)}
+  });
+  function showToast(txt,isError=false){const h=$('hint');h.textContent=txt;h.style.background=isError?'rgba(103,24,50,.95)':''}
+  function resetHint(){showToast(canWrite()?'Sélectionne « Nouveau parcours » ou « Ajouter un spot » pour commencer.':'Connecte-toi avec un compte autorisé pour accéder aux repérages.');}
+  if(!window.L){showToast('Impossible de charger la carte. Vérifie ta connexion Internet.',true);return}
+  // Fonds indépendants : une photographie aérienne IGN n'est pas une image satellite en direct.
+  const map=L.map('map',{zoomControl:true,preferCanvas:true,maxZoom:21}).setView([48.6921,6.1844],11);
+  const geoWmts=(layer,format)=>'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER='+encodeURIComponent(layer)+'&STYLE=normal&FORMAT='+encodeURIComponent(format)+'&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+  const streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxNativeZoom:19,maxZoom:21,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · Itinéraires : <a href="https://project-osrm.org/">OSRM</a>'});
+  const satellite=L.tileLayer(geoWmts('ORTHOIMAGERY.ORTHOPHOTOS','image/jpeg'),{maxNativeZoom:19,maxZoom:21,attribution:'Photographies aériennes &copy; <a href="https://www.ign.fr/">IGN</a>'});
+  const viewStorage='oeil-volant-display-v2';
+  function readView(){try{const v=JSON.parse(localStorage.getItem(viewStorage));return v&&typeof v==='object'?v:{}}catch(e){return {}}}
+  let view=readView();
+  view.base=view.base==='satellite'?'satellite':'street';
+  view.oaci=!!view.oaci;view.uas=!!view.uas;
+  view.opacity=Number.isFinite(view.opacity)?Math.max(25,Math.min(100,view.opacity)):75;
+  function saveView(){try{localStorage.setItem(viewStorage,JSON.stringify(view))}catch(e){}}
+  let activeBase=view.base==='satellite'?satellite:streets;activeBase.addTo(map);
+  const layerStatus=message=>{$('layerStatus').textContent=message||''};
+  let satelliteErrors=0;
+  satellite.on('tileerror',()=>{if(view.base==='satellite'&&++satelliteErrors===3)layerStatus('Les photos aériennes IGN ne chargent pas. Vérifie ta connexion et réessaie sur Plan.')});
+  satellite.on('tileload',()=>{satelliteErrors=0;if(!view.oaci)layerStatus('')});
+  // Les surcouches sont sous les routes et leurs marqueurs, avec opacité réglable.
+  map.createPane('oaciPane');map.getPane('oaciPane').style.zIndex='310';map.getPane('oaciPane').style.pointerEvents='none';
+  map.createPane('uasPane');map.getPane('uasPane').style.zIndex='320';map.getPane('uasPane').style.pointerEvents='none';
+  const oaciWmts=L.tileLayer(geoWmts('GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN-OACI','image/jpeg'),{pane:'oaciPane',minZoom:6,maxNativeZoom:15,maxZoom:21,opacity:view.opacity/100,attribution:'OACI 2026 &copy; IGN / SIA'});
+  // Repli vers la carte 2026 publiée par Esri France si le flux WMTS OACI exige une clé d'accès IGN.
+  // Export dynamique d'images ArcGIS avec reprojection EPSG:3857 des dalles Lambert-93.
+  const ArcgisOaci=L.TileLayer.extend({
+    getTileUrl(coords){
+      const edge=20037508.342789244, span=2*edge/Math.pow(2,coords.z), x=-edge+coords.x*span, y=edge-coords.y*span;
+      const bbox=[x,y-span,x+span,y].map(v=>v.toFixed(2)).join(',');
+      return 'https://services.esrifrance.fr/arcgis/rest/services/IGN/France_SCANOACI/MapServer/export?'+
+        'f=image&bbox='+bbox+'&bboxSR=3857&imageSR=3857&size=256,256&dpi=96&format=png32&transparent=true&layers=show%3A1';
+    }
+  });
+  const oaciEsri=new ArcgisOaci('',{pane:'oaciPane',minZoom:6,maxNativeZoom:13,maxZoom:21,opacity:view.opacity/100,attribution:'OACI-VFR 2026 &copy; IGN / SIA – Esri France'});
+  let oaciSource=oaciWmts,oaciErrorCount=0,esriErrorCount=0;
+  function useEsriOaci(){
+    if(oaciSource===oaciEsri||!view.oaci)return;
+    map.removeLayer(oaciWmts);oaciSource=oaciEsri;
+    layerStatus('OACI : tentative avec le service alternatif Esri France 2026…');
+    oaciEsri.addTo(map);
+  }
+  oaciWmts.on('tileerror',()=>{if(view.oaci&&++oaciErrorCount>=3)useEsriOaci()});
+  oaciWmts.on('tileload',()=>{layerStatus('')});
+  oaciEsri.on('tileload',()=>{esriErrorCount=0;layerStatus('')});
+  oaciEsri.on('tileerror',()=>{if(view.oaci&&++esriErrorCount===3)layerStatus('OACI indisponible depuis ce navigateur : ouvre « Cartes officielles » pour la consulter. Les autres couches restent utilisables.')});
+  const uas=L.tileLayer(geoWmts('TRANSPORTS.DRONES.RESTRICTIONS','image/png'),{pane:'uasPane',minZoom:5,maxNativeZoom:18,maxZoom:21,opacity:.72,attribution:'Restrictions drones &copy; DGAC / IGN'});
+  let uasErrors=0;
+  uas.on('tileerror',()=>{if(view.uas&&++uasErrors===3)layerStatus('La couche DGAC ne se charge pas actuellement. Vérifie les restrictions sur le site officiel.')});
+  uas.on('tileload',()=>{uasErrors=0;if(!view.oaci)layerStatus('')});
+  // Ordre Leaflet : les groupes de tracés / spots restent toujours au-dessus des fonds.
+  const drawn=L.layerGroup().addTo(map), preview=L.layerGroup().addTo(map);
+  function refreshLayers(){
+    const next=view.base==='satellite'?satellite:streets;
+    if(activeBase!==next){map.removeLayer(activeBase);next.addTo(map);next.bringToBack();activeBase=next;}
+    if(view.oaci&&!map.hasLayer(oaciSource)){oaciSource.addTo(map)}
+    if(!view.oaci){if(map.hasLayer(oaciWmts))map.removeLayer(oaciWmts);if(map.hasLayer(oaciEsri))map.removeLayer(oaciEsri);layerStatus('')}
+    if(view.uas&&!map.hasLayer(uas))uas.addTo(map);
+    if(!view.uas&&map.hasLayer(uas))map.removeLayer(uas);
+    oaciWmts.setOpacity(view.opacity/100);oaciEsri.setOpacity(view.opacity/100);
+    document.querySelectorAll('[name="baseMap"]').forEach(el=>el.checked=el.value===view.base);
+    $('oaciToggle').checked=view.oaci;$('uasToggle').checked=view.uas;
+    $('oaciOpacityControl').hidden=!view.oaci;$('oaciOpacity').value=view.opacity;$('oaciOpacityValue').textContent=view.opacity+' %';
+    saveView();
+  }
+  document.querySelectorAll('[name="baseMap"]').forEach(el=>el.addEventListener('change',()=>{view.base=el.value;refreshLayers()}));
+  $('oaciToggle').addEventListener('change',e=>{view.oaci=e.target.checked;layerStatus('');refreshLayers()});
+  $('uasToggle').addEventListener('change',e=>{view.uas=e.target.checked;layerStatus('');refreshLayers()});
+  $('oaciOpacity').addEventListener('input',e=>{view.opacity=Number(e.target.value);refreshLayers()});
+  const mobile=window.matchMedia&&window.matchMedia('(max-width:620px)').matches;
+  let layersCollapsed=mobile;
+  function showLayerPanel(){ $('layerPanel').classList.toggle('collapsed',layersCollapsed);$('layerHead').setAttribute('aria-expanded',String(!layersCollapsed));$('layerChevron').textContent=layersCollapsed?'▾':'▴'}
+  $('layerHead').addEventListener('click',()=>{layersCollapsed=!layersCollapsed;showLayerPanel()});
+  showLayerPanel();refreshLayers();
+  const markerIcon=(label,color)=>L.divIcon({className:'',html:`<div class="marker-end" style="background:${color}">${label}</div>`,iconSize:[28,28],iconAnchor:[14,14]});
+  const spotIcon=category=>L.divIcon({className:'',html:`<div class="spot-pin"><span>${CATEGORIES[category]?.[0]||'📍'}</span></div>`,iconSize:[32,32],iconAnchor:[16,30]});
+  const validPoint=p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v))&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180;
+  function popupRoute(r){return `<strong>${esc(r.name)}</strong><p>${esc(r.type||'Parcours')} · ${fmtDist(r.distance||0)}</p>${r.notes?`<p>${esc(r.notes).replace(/\n/g,'<br>')}</p>`:''}`}
+  function popupSpot(s){const link=/^https:\/\//.test(s.link||'')?`<p><a href="${esc(s.link)}" target="_blank" rel="noopener noreferrer">Ouvrir le lien associé</a></p>`:'';return `<strong>${esc(s.name)}</strong><p>${esc(CATEGORIES[s.category]?.[1]||'Spot')}</p>${s.notes?`<p>${esc(s.notes).replace(/\n/g,'<br>')}</p>`:''}${link}`}
+  function drawAll(){
+    drawn.clearLayers();
+    for(const r of data.routes){if(r.hidden||r.id===editId||!Array.isArray(r.geometry)||r.geometry.length<2)continue;
+      const group=L.featureGroup();
+      L.polyline(r.geometry,{color:'#fff',weight:9,opacity:.93,lineCap:'round',lineJoin:'round',interactive:false}).addTo(group);
+      L.polyline(r.geometry,{color:r.color||COLORS[0],weight:5,opacity:.98,lineCap:'round',lineJoin:'round'}).bindPopup(popupRoute(r)).addTo(group);
+      if(Array.isArray(r.points)&&r.points.length>=2){L.marker(r.points[0],{icon:markerIcon('A','#20986e')}).bindPopup('Départ · '+esc(r.name)).addTo(group);L.marker(r.points[r.points.length-1],{icon:markerIcon('B','#d35366')}).bindPopup('Arrivée · '+esc(r.name)).addTo(group)}
+      group.addTo(drawn);
+    }
+    for(const s of data.spots){if(s.hidden||!validPoint(s.point))continue;L.marker(s.point,{icon:spotIcon(s.category)}).bindPopup(popupSpot(s)).addTo(drawn)}
+    $('routeCount').textContent=data.routes.length;$('spotCount').textContent=data.spots.length;
+  }
+  function focusEntity(kind,id){const entity=data[kind].find(x=>x.id===id);if(!entity)return;
+    if(kind==='routes'&&entity.geometry?.length>1)map.fitBounds(L.latLngBounds(entity.geometry).pad(.20),{maxZoom:15});
+    else if(kind==='spots'&&validPoint(entity.point))map.setView(entity.point,15);
+  }
+  function renderList(){
+    $('listView').hidden=mode!=='idle';$('editorView').hidden=mode==='idle';
+    document.querySelectorAll('[data-tab]').forEach(el=>el.classList.toggle('selected',el.dataset.tab===tab));
+    $('newRoute').disabled=mode!=='idle'||!canWrite();$('newSpot').disabled=mode!=='idle'||!canWrite();
+    if(mode!=='idle')return;
+    const q=$('filter').value.trim().toLowerCase();
+    const arr=data[tab].filter(x=>[x.name,x.notes,x.type,CATEGORIES[x.category]?.[1]].some(t=>String(t||'').toLowerCase().includes(q)));
+    if(!arr.length){$('items').innerHTML=`<div class="empty"><div class="empty-icon">${tab==='routes'?'🛣️':'📸'}</div><strong>${q?'Aucun résultat':tab==='routes'?'Aucun parcours pour l’instant':'Aucun spot pour l’instant'}</strong><p>${q?'Essaie une autre recherche.':tab==='routes'?'Crée un parcours, choisis un départ et une arrivée sur la carte.':'Ajoute tes lieux de repérage, tes points de vue et tes décors préférés.'}</p></div>`;return}
+    $('items').innerHTML=arr.map(x=>`<article class="item"><div class="swatch" style="background:${tab==='routes'?COLORS.includes(x.color)?x.color:COLORS[0]:'#9b77e7'}"></div><div class="item-main"><div class="item-name" title="${esc(x.name)}">${esc(x.name)}</div><div class="item-meta">${tab==='routes'?`${esc(x.type||'Route')} · ${fmtDist(x.distance||0)} · ${Math.max(0,(x.points?.length||2)-2)} passage(s)`:`${esc(CATEGORIES[x.category]?.[1]||'Spot')} · ${x.point?.map(n=>n.toFixed(4)).join(', ')||''}`}</div><div class="item-owner">${x.createdByEmail?`Ajouté par ${esc(x.createdByEmail)}`:''}</div><div class="item-actions"><button class="mini" data-action="focus" data-id="${esc(x.id)}">Voir sur la carte</button>${canEditItem(x)?`<button class="mini" data-action="edit" data-id="${esc(x.id)}">Modifier</button><button class="mini danger" data-action="delete" data-id="${esc(x.id)}">Supprimer</button>`:''}</div></div><button class="visible-toggle" data-action="toggle" data-id="${esc(x.id)}" title="${x.hidden?'Afficher':'Masquer'}">${x.hidden?'◌':'◉'}</button></article>`).join('');
+  }
+  function formValues(){if(!draft)return;draft.name=($('entryName')?.value||'').trim();draft.notes=$('entryNotes')?.value||'';if(mode==='route'){draft.type=$('entryType')?.value||'Auto / moto'}else{draft.category=$('entryCategory')?.value||'photo';draft.link=$('entryLink')?.value?.trim()||''}}
+  function begin(type,record=null){
+    if(!canWrite() || (record && !canEditItem(record)))return;
+    if(requestController)requestController.abort();clearTimeout(routeTimer);routeRequestId++;
+    editId=record?.id||null;mode=type;draft=record?structuredClone(record):type==='route'?{id:uid(),name:'',notes:'',type:'Auto / moto',color:COLORS[0],points:[],geometry:[],distance:0,hidden:false}:{id:uid(),name:'',notes:'',category:'photo',point:null,link:'',hidden:false};
+    drawAll();renderEditor();renderList();
+    if(type==='route'){showToast('Clique sur le départ A puis l’arrivée B. Les clics suivants ajoutent des points de passage avant B.');if(draft.points.length>=2){drawPreview();}}
+    else{showToast('Clique sur la carte pour placer ton spot. Tu peux déplacer le marqueur ensuite.');drawPreview()}
+  }
+  function renderEditor(){
+    if(mode==='idle')return;
+    const route=mode==='route';
+    $('editorView').innerHTML=`<div class="editor"><h2>${editId?'Modifier': 'Créer'} ${route?'un parcours':'un spot'}</h2><p class="lead">${route?'Le tracé suit les routes automatiquement. Ajoute des points de passage pour choisir des virages précis.':'Clique sur la carte pour placer le point, puis renseigne sa fiche.'}</p><div class="form-group"><label for="entryName">Nom ${route?'du parcours':'du spot'}</label><input class="field" id="entryName" maxlength="100" placeholder="${route?'Ex. Route des lacets – tournage auto':'Ex. Point de vue coucher de soleil'}" value="${esc(draft.name)}"></div><div class="form-group"><label for="${route?'entryType':'entryCategory'}">${route?'Type de tournage':'Catégorie'}</label>${route?`<select id="entryType" class="field">${['Auto / moto','FPV – route fermée','Vidéo de paysage','Repérage','Autre'].map(t=>`<option value="${t}" ${draft.type===t?'selected':''}>${t}</option>`).join('')}</select>`:`<select id="entryCategory" class="field">${Object.entries(CATEGORIES).map(([k,v])=>`<option value="${k}" ${draft.category===k?'selected':''}>${v[0]} ${v[1]}</option>`).join('')}</select>`}</div>${route?`<div class="form-group"><label>Couleur du tracé</label><div id="palette" class="palette">${COLORS.map(color=>`<button class="color-btn ${color===draft.color?'active':''}" style="background:${color}" data-color="${color}" aria-label="Choisir ${color}" title="${color}"></button>`).join('')}</div></div>`:''}<div class="form-group"><label for="entryNotes">Notes, accès, idées de prises de vue</label><textarea id="entryNotes" class="field" placeholder="Ex. Lumière du soir, circulation, parking, autorisations à vérifier...">${esc(draft.notes)}</textarea></div>${route?`<div id="stepInfo" class="route-steps"></div>`:`<div class="form-group"><label for="entryLink">Lien photo / vidéo (optionnel, HTTPS)</label><input type="url" class="field" id="entryLink" placeholder="https://..." value="${esc(draft.link)}"></div><div id="stepInfo" class="route-steps"></div>`}<p class="status" id="editorStatus"></p><div class="buttons">${route?'<button id="undoPoint" class="btn secondary">↶ Retirer un point</button>':''}<button id="cancelEdit" class="btn secondary">Annuler</button><button id="saveEdit" class="btn primary">✓ Enregistrer</button></div></div>`;
+    $('entryName').addEventListener('input',()=>{draft.name=$('entryName').value});
+    $('entryNotes').addEventListener('input',()=>draft.notes=$('entryNotes').value);
+    if(route){$('entryType').addEventListener('change',()=>draft.type=$('entryType').value);$('palette').addEventListener('click',e=>{let t=e.target.closest('[data-color]');if(!t)return;draft.color=t.dataset.color;document.querySelectorAll('.color-btn').forEach(el=>el.classList.toggle('active',el===t));drawPreview()});$('undoPoint').addEventListener('click',()=>{if(draft.points.length){draft.points.length>2?draft.points.splice(-2,1):draft.points.pop();draft.geometry=[];draft.distance=0;recalculate()}})}
+    else{$('entryCategory').addEventListener('change',()=>{draft.category=$('entryCategory').value;drawPreview()});$('entryLink').addEventListener('input',()=>draft.link=$('entryLink').value)}
+    $('cancelEdit').addEventListener('click',stopEditing);$('saveEdit').addEventListener('click',saveEdit);
+    updateStepInfo();
+  }
+  function updateStepInfo(msg='',isError=false){
+    if(mode==='idle')return;
+    const panel=$('stepInfo'),status=$('editorStatus');if(!panel)return;
+    if(mode==='route'){
+      const n=draft.points.length;panel.innerHTML=n===0?'📍 En attente du <strong>point de départ A</strong>.':n===1?'🟢 Départ A placé. Clique sur l’<strong>arrivée B</strong>.':`🟢 Départ A · 🔴 Arrivée B<br><strong>${n-2} point(s) de passage</strong> · ${draft.geometry?.length?fmtDist(draft.distance):'Calcul du tracé…'}<br><span style="color:#ac9fc9">Un nouveau clic sur la carte ajoute un passage avant B.</span>`;
+      if($('undoPoint'))$('undoPoint').disabled=n===0;
+      $('saveEdit').disabled=n<2||!draft.geometry?.length;
+    }else{panel.innerHTML=draft.point?`📍 Position : <strong>${draft.point.map(v=>v.toFixed(5)).join(' / ')}</strong><br>Fais glisser le marqueur ou clique ailleurs pour déplacer le spot.`:'📍 Clique sur la carte pour choisir la position du spot.';$('saveEdit').disabled=!draft.point}
+    status.textContent=msg;status.classList.toggle('error',isError);
+  }
+  function drawPreview(){
+    preview.clearLayers();if(!draft)return;
+    if(mode==='spot'){if(draft.point){const marker=L.marker(draft.point,{icon:spotIcon(draft.category),draggable:true}).addTo(preview);marker.on('dragend',e=>{const p=e.target.getLatLng();draft.point=[p.lat,p.lng];updateStepInfo()})}return}
+    if(mode==='route'){
+      const p=draft.points||[];
+      if(draft.geometry?.length>1){L.polyline(draft.geometry,{color:'#fff',weight:10,opacity:.95,interactive:false}).addTo(preview);L.polyline(draft.geometry,{color:draft.color,weight:6,opacity:1}).addTo(preview)}
+      p.forEach((point,i)=>{const isStart=i===0,isEnd=i===p.length-1&&i>0;const marker=L.marker(point,{icon:markerIcon(isStart?'A':isEnd?'B':String(i),isStart?'#20986e':isEnd?'#d35366':'#655589'),draggable:true}).addTo(preview);marker.bindTooltip(isStart?'Départ A':isEnd?'Arrivée B':`Passage ${i}`,{direction:'top',offset:[0,-10]});marker.on('dragend',e=>{const q=e.target.getLatLng();draft.points[i]=[q.lat,q.lng];recalculate()})});
+    }
+  }
+  function recalculate(){
+    if(mode!=='route')return;
+    if(requestController)requestController.abort();clearTimeout(routeTimer);
+    const myId=++routeRequestId;draft.geometry=[];draft.distance=0;drawPreview();
+    if(draft.points.length<2){updateStepInfo();return}
+    const points=draft.points.map(p=>`${p[1].toFixed(6)},${p[0].toFixed(6)}`).join(';');
+    const url=`https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson&steps=false`;
+    requestController=new AbortController();const controller=requestController;const timer=setTimeout(()=>controller.abort(),18000);
+    updateStepInfo('Recherche du parcours sur le réseau routier…');
+    routeTimer=setTimeout(()=>fetch(url,{signal:controller.signal}).then(r=>{if(!r.ok)throw Error('Service d’itinéraire indisponible');return r.json()}).then(result=>{
+      if(myId!==routeRequestId||mode!=='route')return;
+      if(result.code!=='Ok'||!result.routes?.[0]?.geometry?.coordinates)throw Error('Aucun parcours routier trouvé pour ces points.');
+      draft.geometry=result.routes[0].geometry.coordinates.map(([lng,lat])=>[lat,lng]);draft.distance=result.routes[0].distance;
+      drawPreview();updateStepInfo('Tracé calculé : tu peux enregistrer le parcours.');
+    }).catch(e=>{if(myId!==routeRequestId||mode!=='route')return;updateStepInfo(e.name==='AbortError'?'Le calcul a expiré. Essaie de déplacer un point.':e.message+' Vérifie ta connexion ou déplace un point.',true)}).finally(()=>clearTimeout(timer)),1200);
+  }
+  function stopEditing(){if(requestController)requestController.abort();clearTimeout(routeTimer);routeRequestId++;mode='idle';draft=null;editId=null;preview.clearLayers();drawAll();renderList();resetHint()}
+  async function saveEdit(){
+    if(!draft||mode==='idle')return;formValues();
+    if(!draft.name){updateStepInfo('Donne un nom à cet élément avant de l’enregistrer.',true);$('entryName').focus();return}
+    if(mode==='route'&&(draft.points.length<2||!draft.geometry?.length)){updateStepInfo('Choisis deux points et attends le tracé routier.',true);return}
+    if(mode==='spot'&&!validPoint(draft.point)){updateStepInfo('Choisis un emplacement sur la carte.',true);return}
+    if(mode==='spot'&&draft.link&&!/^https:\/\/[^\s]+$/i.test(draft.link)){updateStepInfo('Le lien doit commencer par https://, ou être laissé vide.',true);return}
+    const kind=mode==='route'?'routes':'spots';const cleaned=structuredClone(draft);
+    $('saveEdit').disabled=true;updateStepInfo('Enregistrement partagé en cours…');
+    try {
+      if (!cloud || !canWrite()) throw Error('Connexion collaborative requise.');
+      await cloud.save(kind,cleaned);
+      const entityId=draft.id;stopEditing();tab=kind;renderList();
+      showToast('✓ '+(kind==='routes'?'Parcours':'Spot')+' ajouté à la carte commune.');
+      setTimeout(()=>focusEntity(kind,entityId),400);
+    } catch(err) {updateStepInfo('Enregistrement refusé : '+err.message,true);$('saveEdit').disabled=false;}
+  }
+  map.on('click',evt=>{
+    if(mode==='idle')return;
+    const p=[evt.latlng.lat,evt.latlng.lng];
+    if(mode==='spot'){draft.point=p;drawPreview();updateStepInfo('Emplacement choisi.');return}
+    if(mode==='route'){
+      if(draft.points.length<2)draft.points.push(p);else draft.points.splice(draft.points.length-1,0,p);
+      recalculate();
+    }
+  });
+  $('newRoute').addEventListener('click',()=>begin('route'));
+  $('newSpot').addEventListener('click',()=>begin('spot'));
+  document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{tab=btn.dataset.tab;renderList()}));
+  $('filter').addEventListener('input',renderList);
+  $('items').addEventListener('click',async event=>{
+    const btn=event.target.closest('[data-action]');if(!btn)return;
+    const id=btn.dataset.id,kind=tab,entity=data[kind].find(x=>x.id===id);if(!entity)return;
+    switch(btn.dataset.action){
+      case 'focus':hiddenIds.delete(id);entity.hidden=false;saveHidden();redraw();focusEntity(kind,id);break;
+      case 'edit':if(canEditItem(entity)){begin(kind==='routes'?'route':'spot',entity);focusEntity(kind,id)}break;
+      case 'toggle':entity.hidden=!entity.hidden;entity.hidden?hiddenIds.add(id):hiddenIds.delete(id);saveHidden();redraw();break;
+      case 'delete':if(canEditItem(entity)&&confirm('Supprimer définitivement « '+entity.name+' » de la carte partagée ?')){
+        btn.disabled=true;try{await cloud.remove(kind,entity);showToast('Élément supprimé de la carte partagée.')}catch(e){showToast(e.message,true)}finally{btn.disabled=false}}
+        break;
+    }
+  });
+  function fitAll(){const pts=[];data.routes.filter(r=>!r.hidden).forEach(r=>{if(r.geometry?.length)pts.push(...r.geometry)});data.spots.filter(s=>!s.hidden&&validPoint(s.point)).forEach(s=>pts.push(s.point));if(pts.length){map.fitBounds(L.latLngBounds(pts).pad(.15),{maxZoom:14})}else map.setView([48.6921,6.1844],11)}
+  $('fitMap').addEventListener('click',fitAll);$('nancy').addEventListener('click',()=>map.setView([48.6921,6.1844],11));
+  $('export').addEventListener('click',()=>{
+    if(!cloudReady){showToast('Connecte-toi pour exporter les données partagées.',true);return;}
+    const exported={routes:data.routes.map(({createdAt,updatedAt,...r})=>r),spots:data.spots.map(({createdAt,updatedAt,...s})=>s)};
+    const body=JSON.stringify({format:'oeil-volant-spots',version:1,exportedAt:new Date().toISOString(),...exported},null,2);
+    const blob=new Blob([body],{type:'application/json'});const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download='oeil-volant-spots-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);showToast('Sauvegarde exportée. Conserve ce fichier pour retrouver tes éléments sur un autre appareil.');
+  });
+  $('import').addEventListener('click',()=>{if(!canWrite()){showToast('Accès éditeur requis pour importer.',true);return;}$('importFile').click()});
+  $('importFile').addEventListener('change',async e=>{
+    const file=e.target.files?.[0];if(!file)return;
+    try{const incoming=JSON.parse(await file.text());if(incoming.format!=='oeil-volant-spots'||!Array.isArray(incoming.routes)||!Array.isArray(incoming.spots))throw Error('Format de sauvegarde non reconnu.');
+      if(incoming.routes.length+incoming.spots.length>5000)throw Error('Ce fichier contient trop d’éléments.');
+      const routes=incoming.routes.filter(r=>typeof r.id==='string'&&typeof r.name==='string'&&Array.isArray(r.points)&&r.points.length>=2&&r.points.every(validPoint)&&Array.isArray(r.geometry)&&r.geometry.length>=2&&r.geometry.every(validPoint)).map(r=>({id:r.id,name:r.name.slice(0,100),notes:String(r.notes||'').slice(0,4000),type:String(r.type||'Autre').slice(0,100),color:COLORS.includes(r.color)?r.color:COLORS[0],distance:Number.isFinite(r.distance)?r.distance:0,points:r.points,geometry:r.geometry,hidden:!!r.hidden}));
+      const spots=incoming.spots.filter(s=>typeof s.id==='string'&&typeof s.name==='string'&&validPoint(s.point)).map(s=>({id:s.id,name:s.name.slice(0,100),notes:String(s.notes||'').slice(0,4000),category:CATEGORIES[s.category]?s.category:'autre',link:/^https:\/\/[^\s]+$/i.test(s.link||'')?s.link:'',point:s.point,hidden:!!s.hidden}));
+      if(!confirm('Ajouter jusqu’à '+routes.length+' parcours et '+spots.length+' spots à la carte partagée ? Les éléments déjà enregistrés ne seront pas supprimés.'))return;
+      const total=await cloud.importData({routes,spots});
+      showToast('✓ '+total+' élément(s) ajouté(s) à la carte partagée. Les doublons identifiés ont été ignorés.');
+    }catch(err){showToast('Import impossible : '+err.message,true)}finally{e.target.value=''}
+  });
+  drawAll();renderList();resetHint();initCloud();setTimeout(()=>map.invalidateSize(),150);
+  window.addEventListener('resize',()=>map.invalidateSize());
+})();
+</script>
+</body>
+</html>
