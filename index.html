@@ -238,13 +238,13 @@
     }
     try {
       cloudMessage('Connexion à Firebase…');
-      const module=await import('./collab.js?v=7');
+      const module=await import('./collab.js?fresh=' + Date.now());
       cloud=module.connectCloud(config,{
         onAuth:authChanged,onData:syncData,
         onMembers:members=>{$('memberList').innerHTML=members.length?members.map(m=>`<div class="member-line"><span>${esc(m.email)} · ${m.role==='editor'?'Éditeur':'Lecteur'}</span><button class="mini danger" data-remove-member="${esc(m.email)}">Retirer</button></div>`).join(''):'<p class="guide">Aucun collaborateur invité.</p>'},
         onError:msg=>{cloudMessage('Erreur de synchronisation : '+msg);showToast('Firebase : '+msg,true)}
       });
-    }catch(error){cloudMessage('Connexion Firebase impossible : '+error.message);$('login').disabled=true;}
+   }catch(error){console.error('ERREUR FIREBASE :',error);cloudMessage('Connexion Firebase impossible : '+error.message);$('login').disabled=true;}
   }
   $('login').addEventListener('click',async()=>{try{await cloud?.signIn()}catch(e){showToast('Connexion impossible : '+e.message,true)}});
   $('logout').addEventListener('click',async()=>{try{await cloud?.signOut()}catch(e){showToast(e.message,true)}});
