@@ -31,7 +31,16 @@ export function connectCloud(config, { onAuth, onData, onMembers, onError }) {
   });
   const emitData = () => {
     if (cache.routes !== null && cache.spots !== null)
-      onData({routes:cache.routes, spots:cache.spots});
+      onData({
+  routes: cache.routes.map(r => ({
+    ...r,
+    points: r.points.map(p =>
+      Array.isArray(p) ? p : [p.lat, p.lng]),
+    geometry: r.geometry.map(p =>
+      Array.isArray(p) ? p : [p.lat, p.lng])
+  })),
+  spots: cache.spots
+});
   };
   const isAdmin = () => role === 'admin';
   const canEdit = () => role === 'admin' || role === 'editor';
@@ -90,7 +99,20 @@ export function connectCloud(config, { onAuth, onData, onMembers, onError }) {
           !Array.isArray(payload.point) || payload.point.length!==2) throw Error('Spot invalide.');
     } else if (!Array.isArray(payload.geometry) || payload.geometry.length<2 || payload.geometry.length>15000)
       throw Error('Parcours trop long ou invalide.');
-    await setDoc(refOf(kind,item.id), kind === 'routes' ? encodeRoute(payload) : payload);
+    await setDoc(
+  refOf(kind,item.id),
+  kind === 'routes' ? {
+    ...payload,
+    points: payload.points.map(p => ({
+      lat: p[0] ?? p.lat,
+      lng: p[1] ?? p.lng
+    })),
+    geometry: payload.geometry.map(p => ({
+      lat: p[0] ?? p.lat,
+      lng: p[1] ?? p.lng
+    }))
+  } : payload
+);, kind === 'routes' ? encodeRoute(payload) : payload);
   }
   async function remove(kind, item) {
     assertEdit(); if (!['spots','routes'].includes(kind)) throw Error('Type inconnu.');
