@@ -1,10 +1,8 @@
-// À compléter avec la configuration de ton application Web Firebase.
-// Ces paramètres ne sont PAS des mots de passe : ce sont les règles Firestore qui protègent les données.
-// IMPORTANT : ownerEmail doit être la MÊME adresse Google que dans firestore.rules.
 window.OEIL_FIREBASE_CONFIG = {
-  apiKey: 'COLLER_API_KEY_FIREBASE',
-  authDomain: 'TON_PROJET.firebaseapp.com',
-  projectId: 'TON_PROJET',
-  appId: 'COLLER_APP_ID_FIREBASE',
+  apiKey: 'AIzaSyBP0TgQP8WPRYrIRJnb4mPvQPad6FszeJw',
+  authDomain: 'oeil-volant-carte.firebaseapp.com',
+  projectId: 'oeil-volant-carte',
+  storageBucket: 'oeil-volant-carte.firebasestorage.app',
+  messagingSenderId: '971547724731',
+  appId: '1:971547724731:web:b40f5f41be12ea42aed29e',
   ownerEmail: 'oeil.volant.drone@gmail.com'
-};
