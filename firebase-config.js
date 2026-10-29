@@ -6,5 +6,5 @@ window.OEIL_FIREBASE_CONFIG = {
   authDomain: 'TON_PROJET.firebaseapp.com',
   projectId: 'TON_PROJET',
   appId: 'COLLER_APP_ID_FIREBASE',
-  ownerEmail: 'ton.adresse@gmail.com'
+  ownerEmail: 'oeil.volant.drone@gmail.com'
 };
