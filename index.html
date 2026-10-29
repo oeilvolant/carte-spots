@@ -484,6 +484,145 @@
       showToast('✓ '+total+' élément(s) ajouté(s) à la carte partagée. Les doublons identifiés ont été ignorés.');
     }catch(err){showToast('Import impossible : '+err.message,true)}finally{e.target.value=''}
   });
+    // Désactiver la couche OACI
+  const oaciInput = $('oaciToggle');
+  if (oaciInput) {
+    if (oaciInput.checked) {
+      oaciInput.checked = false;
+      oaciInput.dispatchEvent(new Event('change'));
+    }
+    oaciInput.closest('label')?.remove();
+  }
+  $('oaciOpacityControl')?.remove();
+  const layerInfo = document.querySelector('.layer-info');
+  if (layerInfo) layerInfo.textContent =
+    'Restrictions drones : vérifier les cartes officielles avant chaque vol.';
+  document.querySelector('.map-key span:last-child')?.remove();
+
+  // Barre de recherche et Street View
+  const placeForm = document.createElement('form');
+  placeForm.style.cssText =
+    'padding:10px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;';
+  placeForm.innerHTML = `
+    <input id="placeQuery" class="search"
+      style="min-width:0;margin:0"
+      placeholder="Ville, adresse, lieu, GPS…"
+      aria-label="Rechercher sur la carte" required>
+    <button class="btn primary" type="submit" style="padding:8px">🔎</button>
+    <button class="btn secondary" type="button"
+      id="streetViewBtn" style="padding:8px">Street View</button>
+    <select id="placeResults" class="field"
+      style="grid-column:1/-1" hidden></select>
+    <small id="placeStatus"
+      style="grid-column:1/-1;color:#b9ade0"
+      aria-live="polite">Recherche IGN (France)</small>`;
+  document.querySelector('.actions').after(placeForm);
+
+  const placeQuery = $('placeQuery');
+  const placeResults = $('placeResults');
+  const placeStatus = $('placeStatus');
+  const streetUrl = p =>
+    'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' +
+    encodeURIComponent(p.lat + ',' + p.lng);
+
+  let foundMarker = null;
+  let matches = [];
+
+  function showPlace(place) {
+    if (foundMarker) map.removeLayer(foundMarker);
+    map.setView([place.lat, place.lng], 15);
+    const label = document.createElement('span');
+    label.textContent = place.name;
+    foundMarker = L.marker([place.lat, place.lng])
+      .addTo(map).bindPopup(label).openPopup();
+    placeStatus.textContent = '📍 ' + place.name;
+  }
+
+  placeForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const query = placeQuery.value.trim();
+    if (!query) return;
+    placeResults.hidden = true;
+
+    const gps = query.match(
+      /^(-?\d+(?:[.,]\d+)?)\s*[,;]\s*(-?\d+(?:[.,]\d+)?)$/
+    );
+    if (gps) {
+      const lat = Number(gps[1].replace(',', '.'));
+      const lng = Number(gps[2].replace(',', '.'));
+      if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180)
+        showPlace({lat, lng, name: 'Coordonnées GPS'});
+      else placeStatus.textContent = 'Coordonnées invalides.';
+      return;
+    }
+
+    const button = placeForm.querySelector('[type="submit"]');
+    button.disabled = true;
+    placeStatus.textContent = 'Recherche en cours…';
+
+    try {
+      const url =
+        'https://data.geopf.fr/geocodage/search?index=address,poi&limit=5&q=' +
+        encodeURIComponent(query);
+      const response = await fetch(url);
+      if (!response.ok) throw Error('Service IGN indisponible');
+
+      const json = await response.json();
+      matches = (json.features || [])
+        .filter(f => f.geometry?.type === 'Point')
+        .map(f => ({
+          lat: Number(f.geometry.coordinates[1]),
+          lng: Number(f.geometry.coordinates[0]),
+          name: String(f.properties?.label ||
+            f.properties?.name || query)
+        }))
+        .filter(p => Number.isFinite(p.lat) &&
+          Number.isFinite(p.lng));
+
+      if (!matches.length) {
+        placeStatus.textContent = 'Aucun lieu trouvé.';
+        return;
+      }
+
+      placeResults.replaceChildren(
+        ...matches.map((p, i) => new Option(p.name, String(i)))
+      );
+      placeResults.hidden = matches.length < 2;
+      showPlace(matches[0]);
+
+    } catch (error) {
+      placeStatus.textContent = 'Recherche impossible : ' + error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  placeResults.addEventListener('change', () =>
+    showPlace(matches[Number(placeResults.value)])
+  );
+
+  $('streetViewBtn').addEventListener('click', () => {
+    const p = foundMarker?.getLatLng() || map.getCenter();
+    window.open(streetUrl(p), '_blank', 'noopener,noreferrer');
+  });
+
+  // Street View directement depuis un spot enregistré
+  map.on('popupopen', event => {
+    const p = event.popup._source?.getLatLng?.();
+    const content = event.popup.getElement()
+      ?.querySelector('.leaflet-popup-content');
+    if (!p || !content ||
+        content.querySelector('.ov-streetview')) return;
+
+    const link = document.createElement('a');
+    link.className = 'ov-streetview';
+    link.href = streetUrl(p);
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = '🚶 Ouvrir Street View';
+    link.style.display = 'block';
+    content.appendChild(link);
+  });
   drawAll();renderList();resetHint();initCloud();setTimeout(()=>map.invalidateSize(),150);
   window.addEventListener('resize',()=>map.invalidateSize());
 })();
