@@ -238,7 +238,7 @@
     }
     try {
       cloudMessage('Connexion à Firebase…');
-      const module=await import('./collab.js?v=6');
+      const module=await import('./collab.js?v=7');
       cloud=module.connectCloud(config,{
         onAuth:authChanged,onData:syncData,
         onMembers:members=>{$('memberList').innerHTML=members.length?members.map(m=>`<div class="member-line"><span>${esc(m.email)} · ${m.role==='editor'?'Éditeur':'Lecteur'}</span><button class="mini danger" data-remove-member="${esc(m.email)}">Retirer</button></div>`).join(''):'<p class="guide">Aucun collaborateur invité.</p>'},
