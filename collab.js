@@ -14,6 +14,21 @@ export function connectCloud(config, { onAuth, onData, onMembers, onError }) {
   let user = null, role = null, off = [], cache = {routes: null, spots: null}, editors = [];
   const resetListeners = () => { off.forEach(f => f()); off = []; cache = {routes:null, spots:null}; editors = []; };
   const notifyError = err => onError(err?.message || String(err));
+    // Conversion des coordonnées pour Firebase
+  const encodeRoute = r => ({
+    ...r,
+    points: r.points.map(([lat, lng]) => ({lat, lng})),
+    geometry: r.geometry.map(([lat, lng]) => ({lat, lng}))
+  });
+
+  // Conversion pour afficher les parcours sur la carte
+  const decodeRoute = r => ({
+    ...r,
+    points: r.points.map(p =>
+      Array.isArray(p) ? p : [p.lat, p.lng]),
+    geometry: r.geometry.map(p =>
+      Array.isArray(p) ? p : [p.lat, p.lng])
+  });
   const emitData = () => {
     if (cache.routes !== null && cache.spots !== null)
       onData({routes:cache.routes, spots:cache.spots});
@@ -38,7 +53,10 @@ export function connectCloud(config, { onAuth, onData, onMembers, onError }) {
       if (!role) return;
       for (const kind of ['routes','spots']) {
         off.push(onSnapshot(groupOf(kind), snapshot => {
-          cache[kind] = snapshot.docs.map(entry=>({ ...entry.data(), id:entry.id }));
+          cache[kind] = snapshot.docs.map(entry => {
+  const r = {...entry.data(), id: entry.id};
+  return kind === 'routes' ? decodeRoute(r) : r;
+});
           emitData();
         }, notifyError));
       }
@@ -72,7 +90,7 @@ export function connectCloud(config, { onAuth, onData, onMembers, onError }) {
           !Array.isArray(payload.point) || payload.point.length!==2) throw Error('Spot invalide.');
     } else if (!Array.isArray(payload.geometry) || payload.geometry.length<2 || payload.geometry.length>15000)
       throw Error('Parcours trop long ou invalide.');
-    await setDoc(refOf(kind,item.id), payload);
+    await setDoc(refOf(kind,item.id), kind === 'routes' ? encodeRoute(payload) : payload);
   }
   async function remove(kind, item) {
     assertEdit(); if (!['spots','routes'].includes(kind)) throw Error('Type inconnu.');
@@ -101,7 +119,7 @@ export function connectCloud(config, { onAuth, onData, onMembers, onError }) {
         createdAt:serverTimestamp(), updatedAt:serverTimestamp(),
       };
       delete record.id; delete record.hidden;
-      toCreate.push({kind,id:item.id,record});
+      toCreate.push({kind,id:item.id,record: kind === 'routes' ? encodeRoute(record) : record});
       existingIds.add(kind+'/'+item.id);
     }
     // Écritures groupées. Les sauvegardes déjà présentes ne sont jamais effacées.
