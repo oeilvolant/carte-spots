@@ -6,3 +6,4 @@ window.OEIL_FIREBASE_CONFIG = {
   messagingSenderId: '971547724731',
   appId: '1:971547724731:web:b40f5f41be12ea42aed29e',
   ownerEmail: 'oeil.volant.drone@gmail.com'
+};
