@@ -151,7 +151,7 @@ export function connectCloud(config, { onAuth, onData, onMembers, onError }) {
     else if (existing.createdAt) payload.createdAt = existing.createdAt;
 
     if (kind === 'spots') {
-      if (!['photo', 'video', 'fpv', 'auto', 'paysage', 'autre'].includes(payload.category) ||
+      if (!['photo','video','fpv','auto','paysage','autre','nightkid'].includes(payload.category) ||
           !Array.isArray(payload.point) || payload.point.length !== 2) {
         throw Error('Spot invalide.');
       }
